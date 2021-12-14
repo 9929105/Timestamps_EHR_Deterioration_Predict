@@ -13,8 +13,8 @@ from sklearn.dummy import DummyClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.utils import resample, shuffle
 
-from Source_code.data_preprocessing_pipeline import select_column
-from Source_code.plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc
+from data_preprocessing_pipeline import select_column
+from plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc
 
 
 LR_model = LogisticRegression()

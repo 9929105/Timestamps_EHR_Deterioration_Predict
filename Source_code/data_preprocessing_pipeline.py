@@ -1,10 +1,16 @@
+from icecream import ic
+import os, os.path
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
+
 class DataPipeline(object):
-    _FILE_NAME = '/home/liheng/Mat/Source_code/dataset/dataset_icu.csv'
+
+
+    _FILE_NAME = '/home/teacherjac/Mat/Source_code/dataset/dataset_icu.csv'
+    _FILE_NAME = '~/Timestamps_EHR_Deterioration_Predict/data/fake_data_sample.csv'
     _FILTER_OUTLIERS = False
     _SAMPLE_LENGTH = 24
     _TIME_GAP = 12
@@ -15,6 +21,7 @@ class DataPipeline(object):
     _FNOTES = True
     #_TOD = True
     _SAVE_DIRECTORY = '/home/liheng/Mat/Source_code/dataset/'
+    _SAVE_DIRECTORY = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
 
     def __init__(self, file_name=None, filter_outliers=None, starttime='last', sample_length=None, time_gap=None,
                  matching=False, f_vitals=None, f_vorder=None, f_medorder=None, f_comments=None, f_notes=None,
@@ -36,8 +43,17 @@ class DataPipeline(object):
 
     def get_results(self):
         df = self._data_formating(self.__file_name)
+
         train_co, test_co = self._data_sampling(df, self.__starttime, self.__sample_length, self.__time_to_outcome)
+
+        ic(train_co)
+        ic(test_co)
+
+
+
         train_f, test_f = self._feature_engineering(train_co, test_co)
+
+
         print(self.__time_of_day)
         point_train_data, train_data, train_label, point_test_data, test_data, test_label = \
             self._create_dataset(train_f, test_f, matching=self.__matching,
@@ -50,8 +66,9 @@ class DataPipeline(object):
 
     def save_array(self, point_train_data, train_data, train_label, point_test_data, test_data, test_label):
         folder = self.__starttime + '/'
-        timestep_lenght = 'len' + str(self.__timestep_length)
-        directory = self.__save_dir + folder + timestep_lenght
+        timestep_length = 'len' + str(self.__timestep_length)
+        directory = self.__save_dir + folder+timestep_length
+
         np.save(directory + '_point_train_data.npy', point_train_data)
         np.save(directory + '_train_data.npy', train_data)
         np.save(directory + '_train_label.npy', train_label)
@@ -68,6 +85,7 @@ class DataPipeline(object):
         icu_df = icu_df.astype({'outcome_time': 'datetime64[ns]', 'recorded_time': 'datetime64[ns]'})
         icu_df.replace({'Female': 1, 'Male': 0}, inplace=True)
 
+
         # admission time round by hour
         adm_t = icu_df.groupby('dummy_encounter_id')['recorded_time'].aggregate('min')
         adm_t = (adm_t.astype('int') - adm_t.astype('int') % (60 * 60 * 10 ** 9)).astype('datetime64[ns]')
@@ -78,6 +96,7 @@ class DataPipeline(object):
         #
         cohort_df = pd.merge(proxyend, icu_df, left_index=True, right_on='dummy_encounter_id').rename(
             columns={'outcome_time_x': 'proxyend_time', 'outcome_time_y': 'outcome_time'})
+
         #
         cohort_df = pd.merge(adm_t, cohort_df, left_index=True, right_on='dummy_encounter_id').rename(
             columns={'recorded_time_x': 'adm_time', 'recorded_time_y': 'recorded_time'})
@@ -108,9 +127,11 @@ class DataPipeline(object):
         control_cohort = icu_df[icu_df['dummy_encounter_id'].isin(control_list)]
         outcome_cohort = icu_df[icu_df['dummy_encounter_id'].isin(outcome_list)]
 
+
         # split method
         dfs = [control_cohort, outcome_cohort]
         sampled = []
+
 
         for icu_df in dfs:
             # first 00hrs
@@ -131,6 +152,8 @@ class DataPipeline(object):
             elif starttime == 'random':
                 sampled_df = random_sampling(icu_df, sample_length, time_to_outcome)
             sampled.append(sampled_df)
+
+
 
         control_cohort, outcome_cohort = sampled
         print("control: {}, outcome: {}"
@@ -187,7 +210,10 @@ class DataPipeline(object):
                                     'sample_start', 'dt_start'],
                            inplace=True)
             for idx in tqdm(icu_id):
+
                 df_time = df[df['dummy_encounter_id'] == idx]
+
+
                 sample_start_hour = df_time['sample_start'].dt.hour.unique()
                 # label
                 label = df_time['outcome'].unique()[0]
@@ -249,6 +275,7 @@ class DataPipeline(object):
             series_data = np.concatenate((control_data, outcome_data))
             labels = np.concatenate((control_labels, outcome_labels))
             labels, _ = _label_format(labels)
+
 
             point_training_data, point_holdout_data, training_labels, holdout_labels \
                 = train_test_split(point_data, labels, test_size=0.25, random_state=10)
@@ -461,3 +488,9 @@ def select_column(base=True, vitals=True, v_order=False, med_order=False, commen
     if nlp_topic:
         colname += _NLPTOPIC
     return colname
+
+foo = DataPipeline(starttime='first')
+
+point_train_data, train_data, train_label, point_test_data, test_data, test_label=foo.get_results()
+foo.save_array(point_train_data, train_data, train_label, point_test_data, test_data, test_label)
+

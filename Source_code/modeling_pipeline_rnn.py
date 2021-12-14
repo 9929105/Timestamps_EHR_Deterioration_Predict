@@ -1,4 +1,36 @@
+import matplotlib.pyplot as plt
+import seaborn as sns;
+from operator import add
+from functools import reduce
+from tqdm import tqdm
 
+sns.set()
+import numpy as np
+import pandas as pd
+'''
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.dummy import DummyClassifier
+from sklearn.model_selection import GridSearchCV
+from sklearn.utils import resample, shuffle
+'''
+from data_preprocessing_pipeline import select_column
+from plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc
+
+
+
+
+
+import tensorflow as tf
+import keras_tuner as kt
+
+
+from icecream import ic
+
+
+myDirectory = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
+mySampling = ["first"]
+myTime_of_day = [False, True]
 def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_CI=False):
     results = []
     algorithm_list = ['GRU', 'LSTM']
@@ -253,7 +285,7 @@ def _create_dataset(directory, method, length, normalized, vitals, v_order, med_
     return train_ds, val_ds, test_ds, steps_per_epoch, input_shape
 
 
-class RNNHyperModel(HyperModel):
+class RNNHyperModel(kt.HyperModel):
     _METRICS = [
         tf.keras.metrics.AUC(curve='ROC', name='AUROC'),
         tf.keras.metrics.AUC(curve='PR', name='AUPRC'),
@@ -329,3 +361,5 @@ def get_best_rnn(unit='GRU'):
                  steps_per_epoch=steps_per_epoch,
                  validation_data=val_ds)
     tuner.results_summary()
+
+print(get_results_table(myDirectory, mySampling, [60],myTime_of_day))

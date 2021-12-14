@@ -17,6 +17,12 @@ from data_preprocessing_pipeline import select_column
 from plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc
 
 
+
+
+
+from icecream import ic
+
+
 LR_model = LogisticRegression()
 LR_paragram_grid = [{'penalty': ['l1', 'l2'], 'C': [10 ** n for n in range(-4, 5)],
                      'solver': ['liblinear']},
@@ -32,6 +38,10 @@ RF_best_model = RandomForestClassifier(random_state=1, n_estimators=100, min_sam
                                        max_depth=50)
 baseline_model = DummyClassifier(strategy='most_frequent')
 baseline_paragram_grid=[]
+
+myDirectory = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
+mySampling = ["first"]
+myTime_of_day = [False, True]
 
 def get_results(directory, sampling, time_of_day, calculate_CI=False):
     results = []
@@ -53,9 +63,11 @@ def get_results(directory, sampling, time_of_day, calculate_CI=False):
 
 
 class BuildAlgorithmsSinglePoint(object):
-    _DIRECTORY = '/home/liheng/Mat/Source_code/dataset_sum/'
+    #_DIRECTORY = '/home/liheng/Mat/Source_code/dataset_sum/'
 
-    def __init__(self, directory=None, sampling_method='random', timestep_length=60, algorithm=None, paragram_grid=None,
+    _DIRECTORY = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
+
+    def __init__(self, directory=None, sampling_method='first', timestep_length=60, algorithm=None, paragram_grid=None,
                  vitals=True, v_order=True, med_order=True, comments=True, notes=True, time_of_day=True):
         self.__directory = directory or self._DIRECTORY
         self.__method = sampling_method
@@ -118,6 +130,7 @@ class BuildAlgorithmsSinglePoint(object):
     def _load_data(self, sampling_method, timestep_length):
         directory = self.__directory
         folder = sampling_method
+        ic (folder)
         timestep_length = str(timestep_length)
         point_train_data = np.load(directory + folder + '/len' + timestep_length + '_' + 'point_train_data.npy')
         train_data = np.load(directory + folder + '/len' + timestep_length + '_' + 'train_data.npy')
@@ -210,3 +223,6 @@ def model_validation(model, test_data, true_label, threshold, plot=False):
         AUROC, AUPRC, sensibility, specificity, PPV, NPV, FScore = metrics(true_label, pred_label, p=threshold)
     return AUROC, AUPRC, sensibility, specificity, PPV, NPV, FScore
 
+#### Jacob's New area for running the code ####
+
+print(get_results(myDirectory, mySampling, myTime_of_day))

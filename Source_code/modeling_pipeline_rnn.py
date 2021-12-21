@@ -7,6 +7,9 @@ from tqdm import tqdm
 sns.set()
 import numpy as np
 import pandas as pd
+
+from sklearn.model_selection import train_test_split
+from sklearn.utils import resample, shuffle
 '''
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -15,7 +18,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.utils import resample, shuffle
 '''
 from data_preprocessing_pipeline import select_column
-from plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc
+from plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc, fscore_cal
 
 
 
@@ -26,12 +29,12 @@ import keras_tuner as kt
 
 
 from icecream import ic
-
+import time
 
 myDirectory = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
 mySampling = ["first"]
 myTime_of_day = [False, True]
-def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_CI=False):
+def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_CI=True):
     results = []
     algorithm_list = ['GRU', 'LSTM']
     column = ['AUROC', 'AUPRC', 'sensitivity', 'specificity', 'PPV', 'NPV', 'FScore']
@@ -109,7 +112,12 @@ class BuildAlgorithms(object):
                     = _create_dataset(self.__directory, self.__method, self.__length, self.__normalized,
                                       self.__vitals, self.__v_order, self.__med_order, self.__comments,
                                       self.__notes, self.__time_of_day, self.__batch_size)
-
+                ic(train_ds)
+                ic(val_ds)
+                ic(test_ds)
+                ic(steps_per_epoch)
+                ic(input_shape)
+                ic("********************")
                 RNN_model = self._make_model(self.__metrics, self.__algorithm, input_shape)
                 RNN_history = RNN_model.fit(
                     train_ds,
@@ -139,6 +147,12 @@ class BuildAlgorithms(object):
                                   self.__notes, self.__time_of_day, self.__batch_size)
 
             RNN_model = self._make_model(self.__metrics, self.__algorithm, input_shape)
+
+            ic(self.__epochs)
+            ic(train_ds)
+            ic(steps_per_epoch)
+            ic(self.__early_stopping)
+            ic(val_ds)
             RNN_history = RNN_model.fit(
                 train_ds,
                 epochs=self.__epochs,
@@ -247,6 +261,7 @@ def _oversampling(train_data, train_label):
 
 
 def _batch_dataset(data, label, batch_size=128, repeat=False):
+    batch_size = 1
     data, label = shuffle(data, label)
     dataset = tf.data.Dataset.from_tensor_slices((data, label))
     if repeat:
@@ -260,6 +275,7 @@ def _create_dataset(directory, method, length, normalized, vitals, v_order, med_
     _, train_data, train_label, _, _, _ = _load_data(directory, method, length)
     _, _, _, _, test_data, test_label = _load_data(directory, method, length)
 
+    batch_size = 1
     if normalized:
         train_data, test_data = \
             map(lambda x: _standardize_numeric_col(ds=x), [train_data, test_data])
@@ -273,12 +289,14 @@ def _create_dataset(directory, method, length, normalized, vitals, v_order, med_
         train_test_split(train_data, train_label, test_size=0.25)
     print('train_data shape: {}'.format(train_data.shape))
     train_data, train_label = _oversampling(train_data, train_label)
-    #val_data, val_label = _oversampling(val_data, val_label)
+    #val_data, val_label = _oversampling(val_data, val_label),
     #test_data, test_label = _oversampling(test_data, test_label)
 
     train_ds = _batch_dataset(train_data, train_label, repeat=True)
     val_ds = _batch_dataset(val_data, val_label)
     test_ds = _batch_dataset(test_data, test_label)
+    ic(len(train_data))
+    ic(batch_size)
 
     steps_per_epoch = len(train_data) // batch_size
     input_shape = train_data.shape[-2:]
@@ -332,7 +350,8 @@ class RNNHyperModel(kt.HyperModel):
 
 
 def get_best_rnn(unit='GRU'):
-    _DIRECTORY = '/home/liheng/Mat/Source_code/dataset_sorted/'
+    #_DIRECTORY = '/home/liheng/Mat/Source_code/dataset_sorted/'
+    _DIRECTORY = '/home/teacherjacob/Timestamp_EHR_Deterioration_Predict/dataset_sorted/'
     _, train_data, train_label, _, _, _ = _load_data(_DIRECTORY, 'last', 60)
     train_data = _feature_selection(ds=train_data, time_of_day=True)
     train_data, val_data, train_label, val_label = train_test_split(train_data, train_label, test_size=0.25,
@@ -352,7 +371,8 @@ def get_best_rnn(unit='GRU'):
         objective=kt.Objective("val_AUROC", direction="max"),
         max_epochs=20,
         factor=3,
-        directory='/home/liheng/Mat/search',
+       # directory='/home/liheng/Mat/search',
+        directory='/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/search',
         project_name='MAT_HyperGRU_60lastPRC')
     tuner.search_space_summary()
 
@@ -362,4 +382,8 @@ def get_best_rnn(unit='GRU'):
                  validation_data=val_ds)
     tuner.results_summary()
 
+
+
+ic(time.perf_counter())
 print(get_results_table(myDirectory, mySampling, [60],myTime_of_day))
+ic(time.perf_counter())

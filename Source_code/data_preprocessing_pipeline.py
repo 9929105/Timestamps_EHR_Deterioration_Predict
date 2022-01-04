@@ -6,11 +6,14 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from icecream import ic
 
+from os.path import expanduser
+home = expanduser("~")
+
 class DataPipeline(object):
 
 
-    _FILE_NAME = '/home/teacherjac/Mat/Source_code/dataset/dataset_icu.csv'
-    _FILE_NAME = '~/Timestamps_EHR_Deterioration_Predict/data/fake_data_sample.csv'
+    #_FILE_NAME = '/home/teacherjac/Mat/Source_code/dataset/dataset_icu.csv'
+    _FILE_NAME = home+'/Timestamps_EHR_Deterioration_Predict/data/fake_data_sample.csv'
     _FILTER_OUTLIERS = False
     _SAMPLE_LENGTH = 24
     _TIME_GAP = 12
@@ -20,8 +23,8 @@ class DataPipeline(object):
     _FCOMMENTS = True
     _FNOTES = True
     #_TOD = True
-    _SAVE_DIRECTORY = '/home/liheng/Mat/Source_code/dataset/'
-    _SAVE_DIRECTORY = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
+    #_SAVE_DIRECTORY = '/home/liheng/Mat/Source_code/dataset/'
+    _SAVE_DIRECTORY = home+'/Timestamps_EHR_Deterioration_Predict/data/'
 
     def __init__(self, file_name=None, filter_outliers=None, starttime='last', sample_length=None, time_gap=None,
                  matching=False, f_vitals=None, f_vorder=None, f_medorder=None, f_comments=None, f_notes=None,
@@ -41,6 +44,7 @@ class DataPipeline(object):
         self.__time_of_day = time_of_day
         self.__save_dir = save_dir or self._SAVE_DIRECTORY
 
+    #this function is to load the raw data, and return the values and stored as python arrays 
     def get_results(self):
         df = self._data_formating(self.__file_name)
 
@@ -113,30 +117,37 @@ class DataPipeline(object):
 
         return cohort_df
 
+    
     def _data_sampling(self, dataf, starttime, sample_length=24, time_to_outcome=12):
         # eligable
+        # if the los greater than the number of hours before outcome (12 hours default)
         icu_df = dataf[dataf['los'] >= (sample_length + time_to_outcome)]
-        print("cohort met criteria: {}, control: {}, outcome: {}"
+        print("cohort met criteria: {}, control: {}, outcome: {}"    # just to printer unique encounters
               .format(len(icu_df['dummy_encounter_id'].unique()),
                       len(icu_df[icu_df['outcome'] == 0]['dummy_encounter_id'].unique()),
                       len(icu_df[icu_df['outcome'] == 1]['dummy_encounter_id'].unique())))
 
         # split dataset into control and outcome set
+        # get the unique encntr ids 
         control_list = icu_df[icu_df['outcome'] == 0]['dummy_encounter_id'].unique()
         outcome_list = icu_df[icu_df['outcome'] == 1]['dummy_encounter_id'].unique()
+        
+        #pull all the data rows for those encoutner ids under the pos or neg cases
         control_cohort = icu_df[icu_df['dummy_encounter_id'].isin(control_list)]
         outcome_cohort = icu_df[icu_df['dummy_encounter_id'].isin(outcome_list)]
 
 
-        # split method
+        # split method? not sure what that means
         dfs = [control_cohort, outcome_cohort]
         sampled = []
 
 
         for icu_df in dfs:
-            # first 00hrs
-            if starttime == 'first':
-                icu_df['sample_start'] = icu_df['adm_time']
+            # first 00hrs 
+            if starttime == 'first': 
+                icu_df['sample_start'] = icu_df['adm_time'] # sample_start at admit time 
+                    # the sampled data is all those entries where the recorded time of is less than the sample start + sample_length (default 24 hours) 
+                    ## ?? not sure  
                 sampled_df = icu_df[(icu_df['recorded_time'] < (icu_df['sample_start'] +
                                                             pd.Timedelta(hours=sample_length)))]
                 sampled_df.sort_values(by=['dummy_encounter_id', 'recorded_time'], inplace=True)

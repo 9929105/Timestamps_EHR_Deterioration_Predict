@@ -21,7 +21,8 @@ from data_preprocessing_pipeline import select_column
 from plot_metrics import metrics, plot_cm, plot_pr_curve, plot_roc, fscore_cal
 
 
-
+from os.path import expanduser
+home = expanduser("~")
 
 
 import tensorflow as tf
@@ -31,7 +32,7 @@ import keras_tuner as kt
 from icecream import ic
 import time
 
-myDirectory = '/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/data/'
+myDirectory = home+'/Timestamps_EHR_Deterioration_Predict/data/'
 mySampling = ["first"]
 myTime_of_day = [False, True]
 def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_CI=True):
@@ -57,7 +58,7 @@ def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_
 
 
 class BuildAlgorithms(object):
-    _DIRECTORY = '/home/liheng/Mat/Source_code/dataset/'
+    _DIRECTORY = home+'/Source_code/dataset/'
     _EPOCHS = 1000
     _BATCH_SIZE = 128
 
@@ -188,7 +189,7 @@ class BuildAlgorithms(object):
             ])
 
         RNN_model.compile(
-            optimizer=tf.keras.optimizers.Adam(lr=0.0001),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
             loss=tf.keras.losses.BinaryCrossentropy(),
             metrics=metrics)
 
@@ -351,7 +352,7 @@ class RNNHyperModel(kt.HyperModel):
 
 def get_best_rnn(unit='GRU'):
     #_DIRECTORY = '/home/liheng/Mat/Source_code/dataset_sorted/'
-    _DIRECTORY = '/home/teacherjacob/Timestamp_EHR_Deterioration_Predict/dataset_sorted/'
+    _DIRECTORY = home+'/Timestamp_EHR_Deterioration_Predict/dataset_sorted/'
     _, train_data, train_label, _, _, _ = _load_data(_DIRECTORY, 'last', 60)
     train_data = _feature_selection(ds=train_data, time_of_day=True)
     train_data, val_data, train_label, val_label = train_test_split(train_data, train_label, test_size=0.25,
@@ -372,7 +373,7 @@ def get_best_rnn(unit='GRU'):
         max_epochs=20,
         factor=3,
        # directory='/home/liheng/Mat/search',
-        directory='/home/teacherjacob/Timestamps_EHR_Deterioration_Predict/search',
+        directory=home+'/Timestamps_EHR_Deterioration_Predict/search',
         project_name='MAT_HyperGRU_60lastPRC')
     tuner.search_space_summary()
 

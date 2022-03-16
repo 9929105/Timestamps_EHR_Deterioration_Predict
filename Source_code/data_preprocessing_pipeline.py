@@ -13,15 +13,15 @@ class DataPipeline(object):
 
 
     #_FILE_NAME = '/home/teacherjac/Mat/Source_code/dataset/dataset_icu.csv'
-    _FILE_NAME = home+'/Timestamps_EHR_Deterioration_Predict/data/fake_data_sample.csv'
+    _FILE_NAME = home+'/Timestamps_EHR_Deterioration_Predict/data/nursing_activity_balance.csv'
     _FILTER_OUTLIERS = False
     _SAMPLE_LENGTH = 24
     _TIME_GAP = 12
     _FVATIALS = True
-    _FVORDERS = True
-    _FMEDORDERS = True
-    _FCOMMENTS = True
-    _FNOTES = True
+    _FVORDERS = False
+    _FMEDORDERS = False
+    _FCOMMENTS = False
+    _FNOTES = False
     #_TOD = True
     #_SAVE_DIRECTORY = '/home/liheng/Mat/Source_code/dataset/'
     _SAVE_DIRECTORY = home+'/Timestamps_EHR_Deterioration_Predict/data/'
@@ -173,8 +173,8 @@ class DataPipeline(object):
         return control_cohort, outcome_cohort
 
     def _feature_engineering(self, control_cohort, outcome_cohort):
-        columns = select_column(base=True, vitals=True, v_order=True, med_order=True, comments=True,
-                              notes=True, nlp_topic=False)
+        columns = select_column(base=True, vitals=True, v_order=False, med_order=False, comments=False,
+                              notes=False, nlp_topic=False)
         dfs = [control_cohort, outcome_cohort]
         selected_dfs = []
         for df in dfs:
@@ -198,7 +198,7 @@ class DataPipeline(object):
 
     def _create_dataset(self, control_df, outcome_df, matching=False, timestep_length=60,
                         sample_length=24, time_to_outcome=12,
-                        time_of_day=True, vitals=True, v_order=True, med_order=True, comments=True, notes=True):
+                        time_of_day=True, vitals=True, v_order=False, med_order=False, comments=False, notes=False):
         steps = int(sample_length*60 / timestep_length)
         timestep_length_str = str(timestep_length) + 'T'
         dfs = [control_df, outcome_df]
@@ -310,7 +310,7 @@ def _matching(point_control_data, control_data, control_labels, point_outcome_da
     _, training_outcome_hour = _label_format(training_outcome_labels)
     #holdout_outcome_labels, _ = _label_format(holdout_outcome_labels)
     print("training outcome set shape: point_data {}, data {}, label{}"
-          .format(training_point_outcome_data.shape, training_outcome_data.shape, training_outcome_labels.shape))
+          .format(training_point_outcome_data.shape, trainingf_outcome_data.shape, training_outcome_labels.shape))
     print("holdout outcome set shape: point_data {}, data {}, label{}"
           .format(holdout_point_outcome_data.shape, holdout_outcome_data.shape, holdout_outcome_labels.shape))
 

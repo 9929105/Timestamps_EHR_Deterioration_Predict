@@ -44,7 +44,7 @@ myDirectory = home+'/Timestamps_EHR_Deterioration_Predict/data/'
 mySampling = ["first"]
 myTime_of_day = [False, True]
 
-def get_results(directory, sampling, time_of_day, calculate_CI=False):
+def get_results(directory, sampling, time_of_day, calculate_CI=True):
     results = []
     algorithm_list = ['Logistic_Regression', 'Random_Forest', 'Baseline']  #list of algorithms
     column = ['AUROC', 'AUPRC', 'sensibility', 'specificity', 'PPV', 'NPV', 'FScore'] ; # data that needs to be reported
@@ -114,15 +114,18 @@ class BuildAlgorithmsSinglePoint(object):
 
     
     #now use the model with the testing data
-    def get_results(self, search=False, threshold=0.5, calculate_CI=False):
+    def get_results(self, search=False, threshold=0.5, calculate_CI=True):
             # load the test data
         _, _, _, point_test_data, _, test_label = self._load_data(self.__method, self.__length)
         point_test_data = self._standardize_numeric_col(point_test_data)
-        point_test_data = \ #same features as training
+        #same features as training
+        point_test_data = \
             self._feature_selection(ds=point_test_data, vitals=self.__vitals, v_order=self.__v_order,
                                     med_order=self.__med_order, comments=self.__comments,
                                     notes=self.__notes, time_of_day=self.__time_of_day)
+        
         if calculate_CI: # if we wanted to calculate the confidence interval
+            
             #first init the list of results
             AUROC_list, AUPRC_list, sensibility_list, specificity_list, PPV_list, NPV_list, FScore_list \
                 = list(), list(), list(), list(), list(), list(), list()
@@ -133,6 +136,7 @@ class BuildAlgorithmsSinglePoint(object):
                     var.append(val)
 
             for i in tqdm(list(range(100))):
+                ic("---------- getting best results ----" + str(i))
                 best_model = self.get_best_model(search) # get the best model from training
                 AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore \
                     = model_validation(best_model, point_test_data, test_label, threshold) # validate and return the values

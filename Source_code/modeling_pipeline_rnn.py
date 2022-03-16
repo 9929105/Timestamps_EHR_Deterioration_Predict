@@ -34,7 +34,8 @@ import time
 
 myDirectory = home+'/Timestamps_EHR_Deterioration_Predict/data/'
 mySampling = ["first"]
-myTime_of_day = [False, True]
+#myTime_of_day = [False, True]
+myTime_of_day = [False]
 def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_CI=True):
     results = []
     algorithm_list = ['GRU', 'LSTM']
@@ -59,8 +60,10 @@ def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_
 
 class BuildAlgorithms(object):
     _DIRECTORY = home+'/Source_code/dataset/'
-    _EPOCHS = 1000
+    #_EPOCHS = 1000s
+    _EPOCHS = 10
     _BATCH_SIZE = 128
+    #s_BATCH_SIZE = 8
 
     _early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_AUROC',
@@ -108,7 +111,7 @@ class BuildAlgorithms(object):
                 for var, val in zip(variables, values):
                     var.append(val)
 
-            for i in tqdm(list(range(100))):
+            for i in tqdm(list(range(1))):
                 train_ds, val_ds, test_ds, steps_per_epoch, input_shape \
                     = _create_dataset(self.__directory, self.__method, self.__length, self.__normalized,
                                       self.__vitals, self.__v_order, self.__med_order, self.__comments,
@@ -189,7 +192,7 @@ class BuildAlgorithms(object):
             ])
 
         RNN_model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
             loss=tf.keras.losses.BinaryCrossentropy(),
             metrics=metrics)
 
@@ -384,7 +387,8 @@ def get_best_rnn(unit='GRU'):
     tuner.results_summary()
 
 
-
-ic(time.perf_counter())
+start= time.perf_counter()
 print(get_results_table(myDirectory, mySampling, [60],myTime_of_day))
-ic(time.perf_counter())
+stop = time.perf_counter()
+total_hr = ((stop-start)/60)/60
+ic ("total_run_time_(hr) = ", total_hr)

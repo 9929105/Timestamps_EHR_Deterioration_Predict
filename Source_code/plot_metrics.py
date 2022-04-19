@@ -19,7 +19,9 @@ def metrics(labels, predictions, p=0.5, **kwargs):
     print('Accuracy: ', asc)
     sensitivity = cm[1][1] / cm[1, :].sum()
     specificity = cm[0][0] / cm[0, :].sum()
+    
     PPV = cm[1][1] / cm[:, 1].sum()
+    
     NPV = cm[0][0] / cm[:, 0].sum()
 
     print('Sensitivity: ', sensitivity)
@@ -148,4 +150,11 @@ def plot_calibration(name, labels, predictions, **kwargs):
     plt.tight_layout()
     plt.plot(y, x, marker='o', linewidth=1, label=name)
 
-    
+def calculate_CI(value_list, alpha=0.95):
+        p = (1-alpha)/2*100
+        lower = np.percentile(value_list, p).round(3)
+        upper = np.percentile(value_list, 100-p).round(3)
+        mean = np.mean(value_list).round(3)
+        
+        #return '{} ({}, {})'.format(mean, lower, upper)
+        return mean,lower,upper

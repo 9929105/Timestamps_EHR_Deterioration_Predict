@@ -7,13 +7,13 @@ from sklearn.model_selection import train_test_split
 from icecream import ic
 
 from os.path import expanduser
-home = expanduser("~")
+home = expanduser(".")
 
 class DataPipeline(object):
 
 
     #_FILE_NAME = '/home/teacherjac/Mat/Source_code/dataset/dataset_icu.csv'
-    _FILE_NAME = home+'/Timestamps_EHR_Deterioration_Predict/data/nursing_activity_balance.csv'
+    _FILE_NAME = home+'/../data/two_percent.csv'
     _FILTER_OUTLIERS = False
     _SAMPLE_LENGTH = 24
     _TIME_GAP = 12
@@ -24,12 +24,13 @@ class DataPipeline(object):
     _FNOTES = False
     #_TOD = True
     #_SAVE_DIRECTORY = '/home/liheng/Mat/Source_code/dataset/'
-    _SAVE_DIRECTORY = home+'/Timestamps_EHR_Deterioration_Predict/data/'
+    _SAVE_DIRECTORY = home+'/../data/'
 
-    def __init__(self, file_name=None, filter_outliers=None, starttime='last', sample_length=None, time_gap=None,
+    def __init__(self, file_name=None, data_frame=None, filter_outliers=None, starttime='last', sample_length=None, time_gap=None,
                  matching=False, f_vitals=None, f_vorder=None, f_medorder=None, f_comments=None, f_notes=None,
                  timestep_length=60, time_of_day=True, save_dir=None):
         self.__file_name = file_name or self._FILE_NAME
+        self.__data_frame = data_frame
         self.__filter_outliers = filter_outliers or self._FILTER_OUTLIERS
         self.__starttime = starttime
         self.__sample_length = sample_length or self._SAMPLE_LENGTH
@@ -46,7 +47,7 @@ class DataPipeline(object):
 
     #this function is to load the raw data, and return the values and stored as python arrays 
     def get_results(self):
-        df = self._data_formating(self.__file_name)
+        df = self._data_formating(data_frame=self.__data_frame)
 
         train_co, test_co = self._data_sampling(df, self.__starttime, self.__sample_length, self.__time_to_outcome)
 
@@ -82,8 +83,13 @@ class DataPipeline(object):
         print('Dataset Saved. Sampling: {}, Timestep Length: {}'.format(self.__starttime, self.__timestep_length))
         print('Save to directory: ', self.__save_dir + folder)
 
-    def _data_formating(self, file_name, filter_outliers=False):
-        icu_df = pd.read_csv(file_name)
+    def _data_formating(self, file_name=None, data_frame=None, filter_outliers=False):
+        ic(file_name)
+        if file_name is not None: 
+            ic(file_name)
+            icu_df = pd.read_csv(file_name)
+        else: 
+            icu_df = data_frame
 
         # data cleaning
         icu_df = icu_df.astype({'outcome_time': 'datetime64[ns]', 'recorded_time': 'datetime64[ns]'})
@@ -198,7 +204,8 @@ class DataPipeline(object):
 
     def _create_dataset(self, control_df, outcome_df, matching=False, timestep_length=60,
                         sample_length=24, time_to_outcome=12,
-                        time_of_day=True, vitals=True, v_order=False, med_order=False, comments=False, notes=False):
+                        time_of_day=False, vitals=True, v_order=False, med_order=False, comments=False, notes=False):
+        
         steps = int(sample_length*60 / timestep_length)
         timestep_length_str = str(timestep_length) + 'T'
         dfs = [control_df, outcome_df]
@@ -207,6 +214,7 @@ class DataPipeline(object):
                                 comments=comments, notes=notes)
         print('with columns: ', columns)
         # loop thru icu stays, training
+        
         for df in dfs:
             labels = []
             features = []
@@ -220,7 +228,8 @@ class DataPipeline(object):
             timeframe.drop(columns=['dummy_encounter_id', 'adm_time', 'outcome', 'time_of_day_minute',
                                     'sample_start', 'dt_start'],
                            inplace=True)
-            for idx in tqdm(icu_id):
+            
+            for idx in tqdm(icu_id): # for each visit sum up the count for each time steps ; takes a bit of time
 
                 df_time = df[df['dummy_encounter_id'] == idx]
 
@@ -231,17 +240,18 @@ class DataPipeline(object):
                 df_time = df_time.drop(
                     columns=['dummy_encounter_id', 'adm_time', 'outcome', 'time_of_day_minute', 'sample_start'])
                 df_time = df_time.set_index('dt_start')
-                # Create a single point dataset for logistic regression and tree models (overall counts of records)
+                # Create a single point dataset for logistic regression and tree models (overall counts of records) 
                 point_features = df_time.sum(axis=0).values
                 # Resample data by given length of timestep
-                df_time = pd.concat([timeframe, df_time])
+                df_time = pd.concat([timeframe, df_time]) # put the time column back
                 # Convert sequence to binary variables
                 # df_time = df_time.resample(timestep_length_str).max()
                 # df_time.iloc[:, :-1] = df_time.iloc[:, :-1] != 0
 
                 # Convert sequence to counts per hour
-                cond = {col: 'sum' for col in columns}
-                df_time = df_time.resample(timestep_length_str).agg(cond)
+                cond = {col: 'sum' for col in columns} # for each column, I want the sum of the value
+                # for each hour (or each 15 min depends on the step size), sum it all up
+                df_time = df_time.resample(timestep_length_str).agg(cond) #actual sum is passed as a map
 
                 # Select features
                 df_time = df_time.loc[:, columns]
@@ -268,10 +278,12 @@ class DataPipeline(object):
                         'matrix shape:{}, expected: {}'.format(point_features.shape, (len(columns, )))
                 overallcount.append(point_features)
                 features.append(binary_features)
-
+                
+            ic(overallcount[0])
             final_dataset.append(np.array(overallcount, dtype='float64'))
             final_dataset.append(np.array(features, dtype='float64'))
             final_dataset.append(np.array(labels, dtype='float64'))
+            
         point_control_data, control_data, control_labels, point_outcome_data, outcome_data, outcome_labels \
             = final_dataset
 
@@ -287,7 +299,7 @@ class DataPipeline(object):
             labels = np.concatenate((control_labels, outcome_labels))
             labels, _ = _label_format(labels)
 
-
+            
             point_training_data, point_holdout_data, training_labels, holdout_labels \
                 = train_test_split(point_data, labels, test_size=0.25, random_state=10)
 
@@ -500,8 +512,5 @@ def select_column(base=True, vitals=True, v_order=False, med_order=False, commen
         colname += _NLPTOPIC
     return colname
 
-foo = DataPipeline(starttime='first')
 
-point_train_data, train_data, train_label, point_test_data, test_data, test_label=foo.get_results()
-foo.save_array(point_train_data, train_data, train_label, point_test_data, test_data, test_label)
 

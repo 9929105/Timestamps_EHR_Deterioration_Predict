@@ -38,7 +38,8 @@ mySampling = ["first"]
 myTime_of_day = [False]
 def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_CI=True):
     results = []
-    algorithm_list = ['GRU', 'LSTM']
+    #algorithm_list = ['GRU', 'LSTM']
+    algorithm_list = ['GRU']
     column = ['AUROC', 'AUPRC', 'sensitivity', 'specificity', 'PPV', 'NPV', 'FScore']
 
     for algorithm in tqdm(algorithm_list):
@@ -51,8 +52,8 @@ def get_results_table(directory, sampling, step_lengths, time_of_day, calculate_
                     print(length)
                     x = BuildAlgorithms(directory=directory, sampling_method=method, timestep_length=length,
                                         algorithm=algorithm, time_of_day=time,
-                                        vitals=True, v_order=True, med_order=True,
-                                        comments=True, notes=True, normalized=False)
+                                        vitals=True, v_order=False, med_order=False,
+                                        comments=False, notes=True, normalized=False)
                     results.append(list(x.get_results(calculate_CI=calculate_CI)))
     return pd.DataFrame(results, columns=column, index=pd.MultiIndex.from_product([algorithm_list, sampling,
                                                                                    time_of_day, step_lengths]))
@@ -84,7 +85,7 @@ class BuildAlgorithms(object):
 
     def __init__(self, directory=None, sampling_method='last', timestep_length=60, algorithm=None, epochs=None,
                  batch_size=None, early_stopping=None, metrics=None, vitals=True, v_order=True,
-                 med_order=True, comments=True, notes=True, time_of_day=True, normalized=False):
+                 med_order=False, comments=False, notes=True, time_of_day=True, normalized=False):
         self.__directory = directory or self._DIRECTORY
         self.__method = sampling_method
         self.__length = timestep_length
@@ -101,7 +102,7 @@ class BuildAlgorithms(object):
         self.__time_of_day = time_of_day
         self.__normalized = normalized
 
-    def get_results(self, calculate_CI=False):
+    def get_results(self, calculate_CI=True):
         if calculate_CI:
             AUROC_list, AUPRC_list, sensibility_list, specificity_list, PPV_list, NPV_list, FScore_list \
                 = list(), list(), list(), list(), list(), list(), list()
@@ -111,7 +112,7 @@ class BuildAlgorithms(object):
                 for var, val in zip(variables, values):
                     var.append(val)
 
-            for i in tqdm(list(range(1))):
+            for i in tqdm(list(range(10))):
                 train_ds, val_ds, test_ds, steps_per_epoch, input_shape \
                     = _create_dataset(self.__directory, self.__method, self.__length, self.__normalized,
                                       self.__vitals, self.__v_order, self.__med_order, self.__comments,

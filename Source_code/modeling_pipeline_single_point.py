@@ -23,7 +23,6 @@ home = expanduser("~")
 
 from icecream import ic
 
-
 LR_model = LogisticRegression()
 LR_paragram_grid = [{'penalty': ['l1', 'l2'], 'C': [10 ** n for n in range(-4, 5)],
                      'solver': ['liblinear']},
@@ -40,16 +39,26 @@ RF_best_model = RandomForestClassifier(random_state=1, n_estimators=100, min_sam
 baseline_model = DummyClassifier(strategy='most_frequent')
 baseline_paragram_grid=[]
 
-myDirectory = home+'/Timestamps_EHR_Deterioration_Predict/data/'
-mySampling = ["first"]
-myTime_of_day = [False, True]
+#myDirectory = home+'/Timestamps_EHR_Deterioration_Predict/data/'
+#mySampling = ["first"]
+#myTime_of_day = [False, True]
 
-def get_results(directory, sampling, time_of_day, calculate_CI=True):
+def get_results(directory, input_data_frame_list, sampling, time_of_day, inAlgorithm=None,  inThreshold=None, calculate_CI=True):
     results = []
-    algorithm_list = ['Logistic_Regression', 'Random_Forest', 'Baseline']  #list of algorithms
+    #algorithm_list = ['Logistic_Regression', 'Random_Forest', 'Baseline']  #list of algorithms
+    
+    if inAlgorithm is None:
+        algorithm_list = ['Logistic_Regression', 'Random_Forest', 'Baseline']  #list of algorithms
+    else: 
+        algorithm_list = [inAlgorithm]
+    
+    
     column = ['AUROC', 'AUPRC', 'sensibility', 'specificity', 'PPV', 'NPV', 'FScore'] ; # data that needs to be reported
 
-    thresholds = [0.6, 0.1, 0.5]
+    if inThreshold is None:
+        thresholds = [0.6, 0.1, 0.5]
+    else:
+        thresholds = [inThreshold]
     #set the actual ml classifier map with the label
     algorithms = {'Logistic_Regression': LR_best_model, 'Random_Forest': RF_best_model, 'Baseline': baseline_model} 
     
@@ -58,19 +67,24 @@ def get_results(directory, sampling, time_of_day, calculate_CI=True):
     
     #match them up and go through each of the iteration
     for algorithm, threshold in zip(algorithm_list, thresholds):
+        print (algorithm, threshold)
         for method in sampling: #each of the sampling method (first = counting the samples from admit time to predict outcome, 
                                 #last = counting from the outcome time backwards
                                 # random = either first or last. 
             for time in time_of_day: # to include or not include the time of day into prediction
                 #build and search each classifier for the best one
-                x = BuildAlgorithmsSinglePoint(directory=directory, sampling_method=method, timestep_length=60,
+                x = BuildAlgorithmsSinglePoint(directory=directory, input_data_frame_list=input_data_frame_list, sampling_method=method, timestep_length=60,
                                                algorithm=algorithms[algorithm], paragram_grid=paragram_grids[algorithm],
                                                time_of_day=time)
                 #append the results / default is not to search for the best one (adjust later?) 
                 results.append(list(x.get_results(search=False, threshold=threshold, calculate_CI=calculate_CI)))
             #return the results
-    return pd.DataFrame(results, columns=column,
-                        index=pd.MultiIndex.from_product([algorithm_list, sampling, time_of_day]))
+    
+    r_index = pd.MultiIndex.from_product([algorithm_list, sampling, time_of_day])
+        
+    result_df = pd.DataFrame(results, columns=column,index=r_index)
+    
+    return result_df
 
 
 class BuildAlgorithmsSinglePoint(object):
@@ -78,7 +92,7 @@ class BuildAlgorithmsSinglePoint(object):
 
     _DIRECTORY = home+'/Timestamps_EHR_Deterioration_Predict/data/'
 
-    def __init__(self, directory=None, sampling_method='first', timestep_length=60, algorithm=None, paragram_grid=None,
+    def __init__(self, directory=None,input_data_frame_list=None, sampling_method='first', timestep_length=60, algorithm=None, paragram_grid=None,
                  vitals=True, v_order=True, med_order=True, comments=True, notes=True, time_of_day=True):
         self.__directory = directory or self._DIRECTORY
         self.__method = sampling_method
@@ -91,12 +105,20 @@ class BuildAlgorithmsSinglePoint(object):
         self.__comments = comments
         self.__notes = notes
         self.__time_of_day = time_of_day
-
+        self.__input_data_frame_list = input_data_frame_list
+        
         
         # to search for the best model by searching or just by returning whatever that was last
     def get_best_model(self, search=False):
         # load the training data
-        point_train_data, _, train_label, _, _, _ = self._load_data(self.__method, self.__length)
+        
+        if len(self.__input_data_frame_list) != 6:
+            point_train_data, _, train_label, _, _, _ = self._load_data(self.__method, self.__length)
+        
+        point_train_data = self.__input_data_frame_list[0]
+        train_label =  self.__input_data_frame_list[2]
+        
+        
         point_train_data = self._standardize_numeric_col(point_train_data)
         # adjust for feature (feature selection is done manually)
         point_train_data = \
@@ -116,7 +138,13 @@ class BuildAlgorithmsSinglePoint(object):
     #now use the model with the testing data
     def get_results(self, search=False, threshold=0.5, calculate_CI=True):
             # load the test data
-        _, _, _, point_test_data, _, test_label = self._load_data(self.__method, self.__length)
+        
+        if len(self.__input_data_frame_list) != 6:
+            _, _, _, point_test_data, _, test_label = self._load_data(self.__method, self.__length)
+        
+        point_test_data = self.__input_data_frame_list[3]
+        test_label =  self.__input_data_frame_list[5]
+        
         point_test_data = self._standardize_numeric_col(point_test_data)
         #same features as training
         point_test_data = \
@@ -136,20 +164,24 @@ class BuildAlgorithmsSinglePoint(object):
                     var.append(val)
 
             for i in tqdm(list(range(100))):
-                ic("---------- getting best results ----" + str(i))
+      
                 best_model = self.get_best_model(search) # get the best model from training
                 AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore \
                     = model_validation(best_model, point_test_data, test_label, threshold) # validate and return the values
+            
+            
                 values = [AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore]
                 append_list(variables, values) #append the values into the result list.
             AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore \
                 = list(map(self._calculate_CI, variables)) # for each of the variables calculate CI
+                        
         else:
             best_model = self.get_best_model(search) #if CI not wanted, just return the list of results
             AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore \
                 = model_validation(best_model, point_test_data, test_label, threshold)
         print('AUROC:{}, AUPRC:{}, sensitivity:{}, specificity:{}, PPV:{}, NPV:{}, F-Score:{}'
               .format(AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore))
+        
         return AUROC, AUPRC, sensitivity, specificity, PPV, NPV, FScore
 
     #load the data from processing
@@ -168,11 +200,13 @@ class BuildAlgorithmsSinglePoint(object):
 
     #standarize any numeric values into between 0-1
     def _standardize_numeric_col(self, ds):
-
-        nm_ds = ds[:, :15]
+        nm_ds = ds[:, :15] #exclude  the last column for now, it is the hour column. fake data has all the same hours. original 15
         mean = nm_ds.mean(axis=0)
         std = nm_ds.std(axis=0)
-        standardized_ds = (nm_ds - mean) / std
+        diff = nm_ds-mean
+        #standardized_ds = (nm_ds - mean) / std
+        standardized_ds = np.divide(diff,std)
+      
         standardized_ds = np.concatenate((standardized_ds, ds[:, 15:]), axis=1)
         return standardized_ds
 
@@ -201,7 +235,11 @@ class BuildAlgorithmsSinglePoint(object):
             deposit += _NOTES
         position = list(filter(lambda x: x not in deposit, position))
         return np.take(ds, position, axis=-1)
+    
 
+        
+        
+        
     #sameple to make sure pos cases are same count as neg cases
     def _oversampling(self, train_data, train_label):
         pos_data, pos_label = resample(train_data[train_label == 1], train_label[train_label == 1],
@@ -222,12 +260,16 @@ class BuildAlgorithmsSinglePoint(object):
         return col
 
     #calculate CI
+    
     def _calculate_CI(self, value_list, alpha=0.95):
         p = (1-alpha)/2*100
         lower = np.percentile(value_list, p).round(3)
         upper = np.percentile(value_list, 100-p).round(3)
         mean = np.mean(value_list).round(3)
-        return '{} ({}, {})'.format(mean, lower, upper)
+        
+        #return '{} ({}, {})'.format(mean, lower, upper)
+        #return mean ,lower,upper
+        return mean 
 
 
 # search for the best hyperparameters for the classifier
@@ -258,4 +300,5 @@ def model_validation(model, test_data, true_label, threshold, plot=False):
 
 #### Jacob's New area for running the code ####
 #this is to execute all the stuff above
-print(get_results(myDirectory, mySampling, myTime_of_day))
+##with open("ml_output.txt","a") as o:
+##    o.write(get_results(myDirectory, mySampling, myTime_of_day).to_string())
